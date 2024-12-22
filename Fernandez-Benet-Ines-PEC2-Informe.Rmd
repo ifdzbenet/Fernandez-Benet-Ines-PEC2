@@ -119,9 +119,54 @@ Ahora que tenemos los datos preparedos y el ExpressionSet eset_rma listo, pasamo
 
 ### Análisis de la calidad de la muestra
 
-Comenzamos por el análisis de la calidad de la muestra. Al hacer la matriz de expresión, ya hemos normalizado los datos. Anteriormente hemos visto que los datos presentaban cierta variabilidad con estudios de comparación en gráfico de boxplot, que hemos corregido con la normalización. 
+Comenzamos por el análisis de la calidad de la muestra. Al hacer la matriz de expresión, ya hemos normalizado los datos. Anteriormente hemos visto que los datos presentaban cierta variabilidad con estudios de comparación en gráfico de boxplot, que hemos corregido con la normalización. Ahora, para asegurarnos de que la normalización de la muestra es la opción correcta, haremos un estudio de los Análisis de Componentes Principales (PCA) de los datos en crudo, y tras la transformación.
+
+```{r}
+
+pca_crudo <- prcomp(t(exprs(rawData_filtered)), scale = TRUE)
+
+plot(pca_crudo$x[, 1:2], col=as.factor(pData(rawData_filtered)$infection), 
+     pch=16, xlab="PC1", ylab="PC2", main="PCA de los datos crudos")
+legend("topright", legend=levels(as.factor(pData(rawData_filtered)$infection)), 
+       col=1:length(levels(as.factor(pData(rawData_filtered)$infection))), pch=16)
 
 
+pca_normalizado <- prcomp(t(exprs(eset_rma)), scale = TRUE)
+
+plot(pca_normalizado$x[, 1:2], col=as.factor(pData(eset_rma)$infection), 
+     pch=16, xlab="PC1", ylab="PC2", main="PCA de los datos normalizados")
+legend("topright", legend=levels(as.factor(pData(eset_rma)$infection)), 
+       col=1:length(levels(as.factor(pData(eset_rma)$infection))), pch=16)
+```
+
+
+
+Como podemos observar cuando estudiamos el PCA de los datos en crudo y los datos normalizados, podemos observar claramente que normalizar la muestra es la decisión correcta. No sólo reduce la variabilidad de la muestra, lo que la hace más manejable, sino que ahora podemos ver diferencación entre ambos grupos de investigación (infectado o no). En los datos en crudo, varios de los datos solapaban, algo que no ocurre tras la normalización.
+
+### Filtrado de sondas al 10%
+
+
+
+```{r}
+#BiocManager::install("genefilter")
+#BiocManager::install("org.Mm.eg.db")
+
+
+library(genefilter)
+#library('pd.mouse430.2.db') #hay que cargar la base de datos correspondiente
+library(org.Mm.eg.db) #pd.mouse430.db ya no está disponible, por lo que tenemos que usar org.Mm.eg.db
+
+#y ahora asignar la anotación a nuestra matriz para poder usarla
+annotation(eset_rma) <- "org.Mm.eg.db"
+filtered <- nsFilter(eset_rma, var.filter=TRUE, 
+                     var.func=IQR, var.cutoff=0.10,)
+print(filtered$filter.log)
+eset_filtered <-filtered$eset
+eset_filtered
+
+```
+
+Así, tras filtrar los genes por el 10% de variabilidad, nos quedamos con 40533 genes (features).
 
 
 
