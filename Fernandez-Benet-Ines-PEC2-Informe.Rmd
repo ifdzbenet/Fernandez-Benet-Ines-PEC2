@@ -4,3 +4,129 @@ author: "Inés Elena Fernández Benet"
 date: "`r Sys.Date()`"
 output: pdf_document
 ---
+
+# Análisis de Datos Ómicos - PEC2
+
+
+## Código R
+
+### Preparando los datos
+
+Tras investigar un poco, el archivo .tar se trata de una carpeta comprimida. Al descomprimir la carpeta, pasamos a utilizar el código proporcionado en el archivo selectSamples.R para seleccionar los datos a utilizar para realizar la PEC.
+
+```{r}
+filter_microarray <- function(allTargets, seed = 1413424) {
+  # Configurar la semilla aleatoria
+  set.seed(seed)
+  
+  # Filtrar las filas donde 'time' no sea 'hour 2'
+  filtered <- subset(allTargets, time != "hour 2")
+  
+  # Dividir el dataset por grupos únicos de 'infection' + 'agent'
+  filtered$group <- interaction(filtered$infection, filtered$agent)
+  
+  # Seleccionar 4 muestras al azar de cada grupo
+  selected <- do.call(rbind, lapply(split(filtered, filtered$group), function(group_data) {
+    if (nrow(group_data) > 4) {
+      group_data[sample(1:nrow(group_data), 4), ]
+    } else {
+      group_data
+    }
+  }))
+  
+  # Obtener los índices originales como nombres de las filas seleccionadas
+  original_indices <- match(selected$sample, allTargets$sample)
+  
+  # Modificar los rownames usando 'sample' y los índices originales
+  rownames(selected) <- paste0(selected$sample, ".", original_indices)
+  
+  # Eliminar la columna 'group' y devolver el resultado
+  selected$group <- NULL
+  return(selected)
+}
+
+```
+
+```{r}
+# Simular el dataset basado en la descripción proporcionada
+allTargets <- data.frame(
+  sample = c("GSM944831", "GSM944838", "GSM944845", "GSM944852", "GSM944859",
+             "GSM944833", "GSM944840", "GSM944847", "GSM944854", "GSM944861",
+             "GSM944834", "GSM944841", "GSM944848", "GSM944855", "GSM944862",
+             "GSM944832", "GSM944839", "GSM944846", "GSM944853", "GSM944860",
+             "GSM944835", "GSM944842", "GSM944849", "GSM944856", "GSM944863",
+             "GSM944836", "GSM944843", "GSM944850", "GSM944857", "GSM944864",
+             "GSM944837", "GSM944844", "GSM944851", "GSM944858", "GSM944865"),
+  infection = c(rep("uninfected", 15), rep("S. aureus USA300", 20)),
+  time = c(rep("hour 0", 15), rep("hour 2", 5), rep("hour 24", 15)),
+  agent = c(rep("untreated", 5), rep("linezolid", 5), rep("vancomycin", 5),
+            rep("untreated", 5), rep("untreated", 5), rep("linezolid", 5), rep("vancomycin", 5))
+)
+
+# Aplicar la función (cambiar 123 por vuestro ID de la UOC u otro número que podáis escribir en el documento)
+result <- filter_microarray(allTargets, seed=1413424)
+
+```
+
+
+Ahora pasamos a hacer el objeto ExpressionSet con las muestras que han sido seleccionadas por el código.
+
+```{r}
+#BiocManager::install("oligo")
+
+library("oligo")
+
+#transformamos nuestro dataframe de targets para crear el ExpressionSet
+my.targets <- AnnotatedDataFrame(allTargets)
+
+#leemos los documentos .CEL.gz
+celFiles <- list.files("C:/Users/MiPC/Desktop/UOC/Análisis de Datos Ómicos/PEC2/Fernandez-Benet-Ines-PEC2/GSE38531", pattern = "\\.CEL.gz$", full.names = TRUE)
+
+
+#juntamos toda la información en un ExpressionSet
+rawData <- read.celfiles(celFiles, phenoData = my.targets)
+rawData
+
+#añadimos los nombres de los datos al ExpressionSet
+my.targets@data$sample -> rownames(pData(rawData))
+colnames(rawData) <-rownames(pData(rawData)) 
+
+#ahora filtramos los datos para solo tener las 24 muestras seleccionadas
+rawData_filtered <- rawData[, result$sample]
+rawData_filtered
+
+head(rawData_filtered)
+
+#antes de definir oficialmente nuestro objecto ExpressionSet, vamos a hacer unas 
+#comprobaciones de calidad y normalización
+
+#miramos cómo se distribuyen los datos cuando están en crudo
+boxplot(rawData_filtered, cex.axis=0.5, las=2,  which="all", 
+        main="Distribución de los datos en crudo")
+
+#normalizamos los datos
+eset_rma <- rma(rawData_filtered)
+
+#los datos deberían de mostratrse idénticos, o casi idénticos
+boxplot(eset_rma, cex.axis=0.5, las=2,  which="all", 
+        main="Distribución de los datos normalizados")
+
+
+```
+
+
+Ahora que tenemos los datos preparedos y el ExpressionSet eset_rma listo, pasamos a hacer los estudios de la muestra. 
+
+### Análisis de la calidad de la muestra
+
+Comenzamos por el análisis de la calidad de la muestra. Al hacer la matriz de expresión, ya hemos normalizado los datos. Anteriormente hemos visto que los datos presentaban cierta variabilidad con estudios de comparación en gráfico de boxplot, que hemos corregido con la normalización. 
+
+
+
+
+
+
+
+
+
+
